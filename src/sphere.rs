@@ -1,17 +1,17 @@
 use crate::vec3::{Vec3, Float, Dot, Norm};
-use crate::color::Color;
+use crate::color::Material;
 use crate::object::Intersect;
 use std::option::Option;
 
-pub struct Sphere {
+pub struct Sphere<'a> {
     pos : Vec3,
     radius : Float,
     r2 : Float,
-    color : Color
+    mat : &'a Material 
 }
 
-pub fn new_sphere(p : Vec3, r : Float, c : Color) -> Sphere {
-    Sphere { pos:p, radius:r, r2: r.powf(2.0), color:c }
+pub fn new_sphere(p : Vec3, r : Float, m : &Material) -> Sphere {
+    Sphere { pos:p, radius:r, r2: r.powf(2.0), mat:m }
 }
     
 enum Solution {
@@ -37,7 +37,7 @@ fn solve_quadratic(a : Float, b : Float, c : Float) -> Solution {
     
 }
 
-impl Intersect for Sphere {
+impl<'a> Intersect for Sphere<'a> {
     fn intersect(&self, orig : &Vec3, dir : &Vec3) -> Option<Float> {
         let l = orig.clone() - self.pos;
         let a = dir.dot(&dir);
@@ -63,8 +63,8 @@ impl Intersect for Sphere {
         (v.clone()-self.pos).normalized()
     }
     
-    fn get_color(&self) -> Color {
-        self.color
+    fn get_material(&self) -> &Material {
+        self.mat
     }
 }
 

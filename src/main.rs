@@ -4,20 +4,19 @@ mod sphere;
 mod plane;
 mod object;
 
-use std::f32::consts::PI;
 use rand::prelude::*;
 use std::io::prelude::*;
 use std::fs::File;
 use std::time::Instant;
 
 use vec3::{ Vec3, Float, Norm, Dot };
-use color::{Color, new_color, Lights, Material, Solid};
+use color::{Color, new_color, Lights, Solid, Checker};
 use sphere::new_sphere;
 use plane::new_plane;
 use object::Intersect;
 
 const SUBSAMPLE : u32 = 25;
-const REFLECTIONS : u32 = 50;
+const REFLECTIONS : u32 = 10;
 const BLACK : Color = Vec3(0.0, 0.0, 0.0);
 
 type Hit<'a> = (&'a Intersect, Vec3);
@@ -43,16 +42,17 @@ struct Camera {
 fn main() {
     let filename = "out.ppm";
     let cam = Camera { width:1200, height:800, depth:700 };
-    let s1 = new_sphere(Vec3(-2.0, -5.0, 30.0), 5.0,
-                        new_color(255.0, 100.0, 100.0));
-    let s2 = new_sphere(Vec3(8.0, 1.0, 30.0), 5.0,
-                        new_color(255.0, 100.0, 100.0));
-    let s3 = new_sphere(Vec3(8.0, -10.0, 20.0), 5.0,
-                        new_color(255.0, 100.0, 100.0));
-    let s4 = new_sphere(Vec3(-3.0, 2.0, 10.0), 3.0,
-                        new_color(255.0, 100.0, 100.0));
-    let p1 = new_plane(Vec3(0.0, 3.0, 0.0), Vec3(0.0, 1.0, 0.0),
-                       new_color(100.0, 100.0, 150.0));
+    let m1 = Solid { color: new_color(255.0, 100.0, 100.0),
+                     specular: (8.0, 0.4), reflection: 0.75 };
+                     
+    let m2 = Checker { colors: (new_color(150.0, 150.0, 225.0),
+                                new_color(200.0, 200.0, 300.0)),
+                       uv: 10, specular: (4.0, 0.4), reflection: 0.5 };
+    let s1 = new_sphere(Vec3(-2.0, -5.0, 30.0), 5.0, &m1);
+    let s2 = new_sphere(Vec3(8.0, 1.0, 30.0), 5.0, &m1);
+    let s3 = new_sphere(Vec3(8.0, -10.0, 20.0), 5.0, &m1);
+    let s4 = new_sphere(Vec3(-3.0, 2.0, 10.0), 3.0, &m1);
+    let p1 = new_plane(Vec3(0.0, 3.001, 0.0), Vec3(0.0, 1.0, 0.0), &m2);
     let scene = Scene {
         lights: Lights { dir: (Vec3(-0.5, -1.0, -0.75)).normalized(),
                          ambiant: 0.2,
@@ -124,16 +124,16 @@ fn render_pixel(scene: &Scene, ray: Ray, n: u32) -> Color {
             let surfp = obj.get_surface(&p);
             let np = obj.get_normal(&p);
             let ray2 = Ray { orig: surfp, dir: scene.lights.dir};
-            let spec = ((np*-1.0).dot(&scene.lights.dir).acos() /
-                        (2.0 * PI * 1.0/3.0)).powf(8.0);
-            let col0 = obj.get_color() * (0.2 * spec + scene.lights.ambiant);
+            let m = obj.get_material();
+            let col0 = m.get_color(&p, &np, &scene.lights); 
             let col = cast_ray(&scene.objects, ray2)
                 .map_or(col0, |_| col0 * scene.lights.ambiant );
-            if n > 0 {
+            let reflection = m.get_reflection();
+            if n > 0 && reflection > 0.0 {
                 let ray3 = Ray { orig: surfp,
                                  dir: reflect(p-ray.orig, np) };
                 let col2 = render_pixel(&scene, ray3, n-1);
-                col * 0.5 + col2 * 0.5
+                col * (1.0-reflection) + col2 * reflection
             } else {
                 col
             }

@@ -1,19 +1,19 @@
 use crate::vec3::{Vec3, Float, Dot, Norm};
-use crate::color::Color;
+use crate::color::Material;
 use crate::object::Intersect;
 use std::option::Option;
 
-pub struct Plane {
+pub struct Plane<'a> {
     pos: Vec3,
     normal: Vec3,
-    color: Color
+    mat: &'a Material
 }
 
-pub fn new_plane(p : Vec3, n : Vec3, c : Color) -> Plane {
-    Plane { pos: p, normal: n, color: c }
+pub fn new_plane(p : Vec3, n : Vec3, m : &Material) -> Plane {
+    Plane { pos: p, normal: n, mat: m }
 }
 
-impl Intersect for Plane {
+impl<'a> Intersect for Plane<'a> {
     fn intersect(&self, orig : &Vec3, dir : &Vec3) -> Option<Float> {
         let denom = dir.dot(&self.normal);
         let p = self.pos - orig.clone();
@@ -33,8 +33,8 @@ impl Intersect for Plane {
         v.clone() + self.normal.normalized() * -0.0001
     }
 
-    fn get_color(&self) -> Color {
-        self.color
+    fn get_material(&self) -> &Material {
+        self.mat
     }
 
 }
