@@ -16,7 +16,7 @@ use sphere::new_sphere;
 use plane::new_plane;
 use object::Intersect;
 
-const SUBSAMPLE : u32 = 50;
+const SUBSAMPLE : u32 = 25;
 const REFLECTIONS : u32 = 50;
 const BLACK : Color = Vec3(0.0, 0.0, 0.0);
 
@@ -41,6 +41,7 @@ struct Camera {
 }
 
 fn main() {
+    let filename = "out.ppm";
     let cam = Camera { width:1200, height:800, depth:700 };
     let s1 = new_sphere(Vec3(-2.0, -5.0, 30.0), 5.0,
                         new_color(255.0, 100.0, 100.0));
@@ -55,40 +56,46 @@ fn main() {
     let scene = Scene {
         lights: Lights { dir: (Vec3(-0.5, -1.0, -0.75)).normalized(),
                          ambiant: 0.2,
-                         bg: new_color(10.0, 10.0, 15.0) },
+                         bg: new_color(20.0, 20.0, 30.0) },
         objects: vec![&s1, &s2, &s3, &s4, &p1]
     };
-    let mut frame = vec![BLACK ; (cam.width*cam.height) as usize];
-    
     println!("rendering...");
     let now = Instant::now();
-    render(&mut frame, scene, &cam);
+    let frame = render_frame(scene, &cam);
     let time = now.elapsed().as_millis() as f32 / 1000.0;
-    match write_image(&frame, &cam, "out.ppm") {
-        Ok(()) => println!("out.ppm written, done in {} seconds.", time),
+    println!("done in {} seconds.", time);
+    match write_image(&frame_to_image(&frame), &cam, filename) {
+        Ok(()) => println!("{} written.", filename),
         Err(err) => println!("Error: {}", err)
     }
 }
 
-fn write_image(frame: &Vec<Color>, cam: &Camera, filename: &str) -> OutResult {
-    let mut buffer = File::create(filename)?;
-    let header = format!("P6 {} {} 255\n", cam.width, cam.height);
-    buffer.write(header.as_bytes())?;
-    for c in frame {
-        let buf = [ c.0.min(255.0).max(0.0) as u8,
-                    c.1.min(255.0).max(0.0) as u8,
-                    c.2.min(255.0).max(0.0) as u8 ];
-        buffer.write(&buf)?;
+fn frame_to_image(frame: &Vec<Color>) -> Vec<u8> {
+    let mut buffer = vec![0 as u8 ; frame.len() * 3];    
+    for (i, c) in frame.iter().enumerate() {
+        buffer[i*3+0] = c.0.min(255.0).max(0.0) as u8;
+        buffer[i*3+1] = c.1.min(255.0).max(0.0) as u8;
+        buffer[i*3+2] = c.2.min(255.0).max(0.0) as u8;
     }
+    buffer
+}
+
+fn write_image(img: &Vec<u8>, cam: &Camera, filename: &str) -> OutResult {
+    let header = format!("P6 {} {} 255\n", cam.width, cam.height);    
+    let mut file = File::create(filename)?;
+    file.write(header.as_bytes())?;
+    file.write(&img)?;
     Ok(())
 }
 
-fn render(frame: &mut Vec<Color>, scene: Scene, cam: &Camera) {
+fn render_frame(scene: Scene, cam: &Camera) -> Vec<Color>{
+    let mut frame = vec![BLACK ; (cam.width*cam.height) as usize];
     let mut rng = rand::thread_rng();
     let orig = Vec3(0.0, 0.0, 0.0);
     let center = Vec3(-(cam.width as Float) / 2.0,
                       -(cam.height as Float) /2.0,
                       cam.depth as Float);
+    let mut pc = 0;
     for y in 0..cam.height {
         for x in 0..cam.width {
             let dir = Vec3(x as Float, y as Float, 0.0) + center;
@@ -100,25 +107,31 @@ fn render(frame: &mut Vec<Color>, scene: Scene, cam: &Camera) {
             }
             frame[(x + y * cam.width) as usize] = col / SUBSAMPLE as Float;
         }
-    }    
+        let p = 100*y/cam.height;
+        if p/10 > pc/10 {
+            println!("{}%", p);
+        }
+        pc = p;
+    }
+    println!("100%");
+    frame
 }
 
 fn render_pixel(scene: &Scene, ray: Ray, n: u32) -> Color {
     match cast_ray(&scene.objects, ray) {
         None => scene.lights.bg,
         Some((obj, p)) => {
-            let ray2 = Ray { orig: obj.get_surface(&p), dir: scene.lights.dir};
-            let spec = ((obj.get_normal(&p)*-1.0)
-                        .dot(&scene.lights.dir).acos() /
-                        (2.0*PI*1.0/3.0)).powf(8.0);
+            let surfp = obj.get_surface(&p);
+            let np = obj.get_normal(&p);
+            let ray2 = Ray { orig: surfp, dir: scene.lights.dir};
+            let spec = ((np*-1.0).dot(&scene.lights.dir).acos() /
+                        (2.0 * PI * 1.0/3.0)).powf(8.0);
             let col0 = obj.get_color() * (0.2 * spec + scene.lights.ambiant);
-            let col = match cast_ray(&scene.objects, ray2) {
-                None => col0,
-                _ => col0 * scene.lights.ambiant
-            };
+            let col = cast_ray(&scene.objects, ray2)
+                .map_or(col0, |_| col0 * scene.lights.ambiant );
             if n > 0 {
-                let ray3 = Ray { orig: obj.get_surface(&p),
-                                 dir: reflect(p-ray.orig, obj.get_normal(&p)) };
+                let ray3 = Ray { orig: surfp,
+                                 dir: reflect(p-ray.orig, np) };
                 let col2 = render_pixel(&scene, ray3, n-1);
                 col * 0.5 + col2 * 0.5
             } else {
@@ -133,14 +146,15 @@ fn reflect(v: Vec3, n: Vec3) -> Vec3 {
 }
 
 fn cast_ray<'a>(scene: &Vec<&'a Intersect>, ray: Ray) -> Option<Hit<'a>> {
-    scene.iter().fold(None, |res, obj| match obj.intersect(&ray.orig, &ray.dir) {
-        None => res,
-        Some(z) => {
-            match res {
-                None => Some((*obj, z)),
-                Some((_,i)) if z < i => Some((*obj, z)),
-                _ => res
-            }
-        }
-    }).map(| (obj, z) | (obj, ray.dir * z + ray.orig))
+    scene.iter().fold(None, |res, obj|
+                      match obj.intersect(&ray.orig, &ray.dir) {
+                          None => res,
+                          Some(z) => {
+                              match res {
+                                  None => Some((*obj, z)),
+                                  Some((_,i)) if z < i => Some((*obj, z)),
+                                  _ => res
+                              }
+                          }
+                      }).map(| (obj, z) | (obj, ray.dir * z + ray.orig))
 }
