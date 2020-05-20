@@ -61,7 +61,7 @@ fn main() {
     };
     println!("rendering...");
     let now = Instant::now();
-    let frame = render_frame(scene, &cam);
+    let frame = render_frame(&scene, &cam);
     let time = now.elapsed().as_millis() as f32 / 1000.0;
     println!("done in {} seconds.", time);
     match write_image(&frame_to_image(&frame), &cam, filename) {
@@ -88,7 +88,7 @@ fn write_image(img: &Vec<u8>, cam: &Camera, filename: &str) -> OutResult {
     Ok(())
 }
 
-fn render_frame(scene: Scene, cam: &Camera) -> Vec<Color>{
+fn render_frame(scene: &Scene, cam: &Camera) -> Vec<Color>{
     let mut frame = vec![BLACK ; (cam.width*cam.height) as usize];
     let mut rng = rand::thread_rng();
     let orig = Vec3(0.0, 0.0, 0.0);
@@ -145,16 +145,17 @@ fn reflect(v: Vec3, n: Vec3) -> Vec3 {
     v - n * v.dot(&n) * 2.0
 }
 
-fn cast_ray<'a>(scene: &Vec<&'a Intersect>, ray: Ray) -> Option<Hit<'a>> {
-    scene.iter().fold(None, |res, obj|
-                      match obj.intersect(&ray.orig, &ray.dir) {
-                          None => res,
-                          Some(z) => {
-                              match res {
-                                  None => Some((*obj, z)),
-                                  Some((_,i)) if z < i => Some((*obj, z)),
-                                  _ => res
-                              }
-                          }
-                      }).map(| (obj, z) | (obj, ray.dir * z + ray.orig))
+fn cast_ray<'a>(objs: &Vec<&'a Intersect>, ray: Ray) -> Option<Hit<'a>> {
+    objs.iter().fold(None,
+                     |res, obj|
+                     match obj.intersect(&ray.orig, &ray.dir) {
+                         None => res,
+                         Some(z) => {
+                             match res {
+                                 None => Some((*obj, z)),
+                                 Some((_,i)) if z < i => Some((*obj, z)),
+                                 _ => res
+                             }
+                         }
+                     }).map(| (obj, z) | (obj, ray.dir * z + ray.orig))
 }
