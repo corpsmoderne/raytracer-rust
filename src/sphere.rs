@@ -3,6 +3,7 @@ use crate::color::Material;
 use crate::object::Intersect;
 use std::option::Option;
 
+#[derive(Clone)]
 pub struct Sphere<'a> {
     pos : Vec3,
     radius : Float,

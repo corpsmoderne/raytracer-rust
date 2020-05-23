@@ -9,6 +9,11 @@ use std::io::prelude::*;
 use std::fs::File;
 use std::time::Instant;
 
+use std::thread;
+use std::sync::mpsc;
+use std::sync::mpsc::Sender;
+use std::sync::Arc;
+
 use vec3::{ Vec3, Float, Norm, Dot };
 use color::{Color, new_color, Lights, Solid, Checker};
 use sphere::new_sphere;
@@ -18,6 +23,7 @@ use object::Intersect;
 const SUBSAMPLE : u32 = 25;
 const REFLECTIONS : u32 = 10;
 const BLACK : Color = Vec3(0.0, 0.0, 0.0);
+const THREADS : u32 = 4;
 
 type Hit<'a> = (&'a Intersect, Vec3);
 type OutResult = Result<(), std::io::Error>;
@@ -28,11 +34,13 @@ struct Ray {
     dir: Vec3,
 }
 
-struct Scene<'a> {
+#[derive(Clone)]
+struct Scene {
     lights: Lights,
-    objects: Vec<&'a Intersect>
+    objects: Vec<&'static Intersect>
 }
 
+#[derive(Debug,Clone)]
 struct Camera {
     width: u32,
     height: u32,
@@ -53,6 +61,7 @@ fn main() {
     let s3 = new_sphere(Vec3(8.0, -10.0, 20.0), 5.0, &m1);
     let s4 = new_sphere(Vec3(-3.0, 2.0, 10.0), 3.0, &m1);
     let p1 = new_plane(Vec3(0.0, 3.001, 0.0), Vec3(0.0, 1.0, 0.0), &m2);
+    
     let scene = Scene {
         lights: Lights { dir: (Vec3(-0.5, -1.0, -0.75)).normalized(),
                          ambiant: 0.2,
@@ -61,7 +70,7 @@ fn main() {
     };
     println!("rendering...");
     let now = Instant::now();
-    let frame = render_frame(&scene, &cam);
+    let frame = render_frame(scene, cam.clone());
     let time = now.elapsed().as_millis() as f32 / 1000.0;
     println!("done in {} seconds.", time);
     match write_image(&frame_to_image(&frame), &cam, filename) {
@@ -88,33 +97,49 @@ fn write_image(img: &Vec<u8>, cam: &Camera, filename: &str) -> OutResult {
     Ok(())
 }
 
-fn render_frame(scene: &Scene, cam: &Camera) -> Vec<Color>{
+pub struct Loc(u32,u32,Vec3);
+unsafe impl Send for Loc {}
+unsafe impl Sync for Loc {}
+
+fn render_frame(scene: Scene, cam: Camera) -> Vec<Color>{
     let mut frame = vec![BLACK ; (cam.width*cam.height) as usize];
-    let mut rng = rand::thread_rng();
-    let orig = Vec3(0.0, 0.0, 0.0);
-    let center = Vec3(-(cam.width as Float) / 2.0,
-                      -(cam.height as Float) /2.0,
-                      cam.depth as Float);
-    let mut pc = 0;
-    for y in 0..cam.height {
-        for x in 0..cam.width {
-            let dir = Vec3(x as Float, y as Float, 0.0) + center;
-            let mut col = BLACK;
-            for _ in 0..SUBSAMPLE {
-                let rnd = Vec3(rng.gen(), rng.gen(), 0.0);
-                let ray = Ray { orig: orig, dir: dir + rnd };
-                col = col + render_pixel(&scene, ray, REFLECTIONS);
-            }
-            frame[(x + y * cam.width) as usize] = col / SUBSAMPLE as Float;
-        }
-        let p = 100*y/cam.height;
-        if p/10 > pc/10 {
-            println!("{}%", p);
-        }
-        pc = p;
+
+    let (tx, rx) = mpsc::channel();
+    let slice=cam.height/THREADS;
+    for i in 0..THREADS {
+        println!("from line: {} to: {}", slice*i, slice*(i+1));
+        render_slice(scene.clone(), cam.clone(),
+                     slice*i, slice*(i+1), tx.clone());
     }
-    println!("100%");
+    for _n in 0..cam.width*cam.height {
+        let Loc(x,y,col) = rx.recv().unwrap();
+        frame[(x + y * cam.width) as usize] = col;
+    }
     frame
+}
+
+fn render_slice(scene: Scene, cam: Camera,
+                from: u32, to: u32, tx: Sender<Loc>) {
+    //let scene = Arc::new(scene);
+    //thread::spawn(move || {
+        let mut rng = rand::thread_rng();
+        let orig = Vec3(0.0, 0.0, 0.0);
+        let center = Vec3(-(cam.width as Float) / 2.0,
+                          -(cam.height as Float) /2.0,
+                          cam.depth as Float);
+        for y in from..to {
+            for x in 0..cam.width {
+                let dir = Vec3(x as Float, y as Float, 0.0) + center;
+                let mut col = BLACK;
+                for _ in 0..SUBSAMPLE {
+                    let rnd = Vec3(rng.gen(), rng.gen(), 0.0);
+                    let ray = Ray { orig: orig, dir: dir + rnd };
+                    col = col + render_pixel(&scene, ray, REFLECTIONS);
+                }
+                tx.send(Loc(x, y, col / SUBSAMPLE as Float));
+            }
+        }
+    //});
 }
 
 fn render_pixel(scene: &Scene, ray: Ray, n: u32) -> Color {
@@ -145,7 +170,7 @@ fn reflect(v: Vec3, n: Vec3) -> Vec3 {
     v - n * v.dot(&n) * 2.0
 }
 
-fn cast_ray<'a>(objs: &Vec<&'a Intersect>, ray: Ray) -> Option<Hit<'a>> {
+fn cast_ray<'a>(objs: &'a Vec<&Intersect>, ray: Ray) -> Option<Hit<'a>> {
     objs.iter().fold(None,
                      |res, obj|
                      match obj.intersect(&ray.orig, &ray.dir) {

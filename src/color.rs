@@ -7,13 +7,14 @@ pub fn new_color(r: Float, g: Float, b: Float) -> Color {
     Vec3(r, g, b)
 }
 
+#[derive(Debug,Clone,Copy)]
 pub struct Lights {
     pub dir: Vec3,
     pub ambiant: Float,
     pub bg: Color
 }
 
-pub trait Material {
+pub trait Material : Sync {
     fn get_color(&self, p : &Vec3, n : &Vec3, lights : &Lights) -> Color;
     fn get_reflection(&self) -> Float;
     fn get_specular(&self, specular: (Float, Float),
