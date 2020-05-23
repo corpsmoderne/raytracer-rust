@@ -24,6 +24,7 @@ pub trait Material {
     }
 }
 
+#[derive(Clone)]
 pub struct Solid {
     pub color : Color,
     pub specular : (Float,Float),
@@ -41,6 +42,7 @@ impl Material for Solid {
     }
 }
 
+#[derive(Clone)]
 pub struct Checker {
     pub colors : (Color,Color),
     pub uv : i32,

@@ -3,14 +3,14 @@ use crate::color::Material;
 use crate::object::Intersect;
 use std::option::Option;
 
-pub struct Sphere<'a> {
+pub struct Sphere {
     pos : Vec3,
     radius : Float,
     r2 : Float,
-    mat : &'a Material 
+    mat : Box<dyn Material>
 }
 
-pub fn new_sphere(p : Vec3, r : Float, m : &Material) -> Sphere {
+pub fn new_sphere(p : Vec3, r : Float, m : Box<dyn Material>) -> Sphere {
     Sphere { pos:p, radius:r, r2: r.powf(2.0), mat:m }
 }
     
@@ -37,7 +37,7 @@ fn solve_quadratic(a : Float, b : Float, c : Float) -> Solution {
     
 }
 
-impl<'a> Intersect for Sphere<'a> {
+impl Intersect for Sphere {
     fn intersect(&self, orig : &Vec3, dir : &Vec3) -> Option<Float> {
         let l = orig.clone() - self.pos;
         let a = dir.dot(&dir);
@@ -64,7 +64,7 @@ impl<'a> Intersect for Sphere<'a> {
     }
     
     fn get_material(&self) -> &Material {
-        self.mat
+        &*self.mat
     }
 }
 

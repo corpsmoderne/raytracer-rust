@@ -19,7 +19,7 @@ const SUBSAMPLE : u32 = 25;
 const REFLECTIONS : u32 = 10;
 const BLACK : Color = Vec3(0.0, 0.0, 0.0);
 
-type Hit<'a> = (&'a Intersect, Vec3);
+type Hit<'a> = (&'a dyn Intersect, Vec3);
 type OutResult = Result<(), std::io::Error>;
 
 #[derive(Debug,Clone,Copy)]
@@ -28,37 +28,44 @@ struct Ray {
     dir: Vec3,
 }
 
-struct Scene<'a> {
-    lights: Lights,
-    objects: Vec<&'a Intersect>
-}
-
 struct Camera {
     width: u32,
     height: u32,
     depth: u32
 }
 
-fn main() {
-    let filename = "out.ppm";
-    let cam = Camera { width:1200, height:800, depth:700 };
+struct Scene {
+    lights: Lights,
+    objects: Vec<Box<dyn Intersect>>
+}
+
+fn make_scene() -> Scene {
     let m1 = Solid { color: new_color(255.0, 100.0, 100.0),
                      specular: (8.0, 0.4), reflection: 0.75 };
                      
     let m2 = Checker { colors: (new_color(150.0, 150.0, 225.0),
                                 new_color(200.0, 200.0, 300.0)),
                        uv: 10, specular: (4.0, 0.4), reflection: 0.5 };
-    let s1 = new_sphere(Vec3(-2.0, -5.0, 30.0), 5.0, &m1);
-    let s2 = new_sphere(Vec3(8.0, 1.0, 30.0), 5.0, &m1);
-    let s3 = new_sphere(Vec3(8.0, -10.0, 20.0), 5.0, &m1);
-    let s4 = new_sphere(Vec3(-3.0, 2.0, 10.0), 3.0, &m1);
-    let p1 = new_plane(Vec3(0.0, 3.001, 0.0), Vec3(0.0, 1.0, 0.0), &m2);
-    let scene = Scene {
+    let s1 = Box::new(new_sphere(Vec3(-2.0, -5.0, 30.0), 5.0,
+                                 Box::new(m1.clone())));
+    let s2 = Box::new(new_sphere(Vec3(8.0, 1.0, 30.0), 5.0, Box::new(m1.clone())));
+    let s3 = Box::new(new_sphere(Vec3(8.0, -10.0, 20.0), 5.0, Box::new(m1.clone())));
+    let s4 = Box::new(new_sphere(Vec3(-3.0, 2.0, 10.0), 3.0, Box::new(m1.clone())));
+    let p1 = Box::new(new_plane(Vec3(0.0, 3.001, 0.0), Vec3(0.0, 1.0, 0.0),
+                                Box::new(m2)));
+
+    Scene {
         lights: Lights { dir: (Vec3(-0.5, -1.0, -0.75)).normalized(),
                          ambiant: 0.2,
                          bg: new_color(20.0, 20.0, 30.0) },
-        objects: vec![&s1, &s2, &s3, &s4, &p1]
-    };
+        objects: vec![s1, s2, s3, s4, p1],
+    }
+}
+
+fn main() {
+    let filename = "out.ppm";
+    let cam = Camera { width:1200, height:800, depth:700 };
+    let scene = make_scene();
     println!("rendering...");
     let now = Instant::now();
     let frame = render_frame(&scene, &cam);
@@ -145,17 +152,18 @@ fn reflect(v: Vec3, n: Vec3) -> Vec3 {
     v - n * v.dot(&n) * 2.0
 }
 
-fn cast_ray<'a>(objs: &Vec<&'a Intersect>, ray: Ray) -> Option<Hit<'a>> {
+fn cast_ray<'a>(objs: &'a [Box<dyn Intersect>], ray: Ray)
+                -> Option<Hit<'a>> {
     objs.iter().fold(None,
                      |res, obj|
                      match obj.intersect(&ray.orig, &ray.dir) {
                          None => res,
                          Some(z) => {
                              match res {
-                                 None => Some((*obj, z)),
-                                 Some((_,i)) if z < i => Some((*obj, z)),
+                                 None => Some((obj.as_ref(), z)),
+                                 Some((_,i)) if z < i => Some((obj.as_ref(), z)),
                                  _ => res
                              }
                          }
-                     }).map(| (obj, z) | (obj, ray.dir * z + ray.orig))
+                     }).map(| (obj, z) | (&*obj, ray.dir * z + ray.orig))
 }
