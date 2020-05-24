@@ -23,9 +23,9 @@ use object::Intersect;
 const SUBSAMPLE : u32 = 25;
 const REFLECTIONS : u32 = 10;
 const BLACK : Color = Vec3(0.0, 0.0, 0.0);
-const THREADS : u32 = 4;
+const THREADS : u32 = 8;
 
-type Hit<'a> = (&'a Intersect, Vec3);
+type Hit<'a> = (&'a dyn Intersect, Vec3);
 type OutResult = Result<(), std::io::Error>;
 
 #[derive(Debug,Clone,Copy)]
@@ -35,42 +35,50 @@ struct Ray {
 }
 
 #[derive(Clone)]
-struct Scene {
-    lights: Lights,
-    objects: Vec<&'static Intersect>
-}
-
-#[derive(Debug,Clone)]
 struct Camera {
     width: u32,
     height: u32,
     depth: u32
 }
 
-fn main() {
-    let filename = "out.ppm";
-    let cam = Camera { width:1200, height:800, depth:700 };
+struct Scene {
+    lights: Lights,
+    objects: Vec<Box<dyn Intersect>>
+}
+
+fn make_scene() -> Scene {
     let m1 = Solid { color: new_color(255.0, 100.0, 100.0),
                      specular: (8.0, 0.4), reflection: 0.75 };
                      
     let m2 = Checker { colors: (new_color(150.0, 150.0, 225.0),
                                 new_color(200.0, 200.0, 300.0)),
                        uv: 10, specular: (4.0, 0.4), reflection: 0.5 };
-    let s1 = new_sphere(Vec3(-2.0, -5.0, 30.0), 5.0, &m1);
-    let s2 = new_sphere(Vec3(8.0, 1.0, 30.0), 5.0, &m1);
-    let s3 = new_sphere(Vec3(8.0, -10.0, 20.0), 5.0, &m1);
-    let s4 = new_sphere(Vec3(-3.0, 2.0, 10.0), 3.0, &m1);
-    let p1 = new_plane(Vec3(0.0, 3.001, 0.0), Vec3(0.0, 1.0, 0.0), &m2);
-    
-    let scene = Scene {
+    let s1 = Box::new(new_sphere(Vec3(-2.0, -5.0, 30.0), 5.0,
+                                 Box::new(m1.clone())));
+    let s2 = Box::new(new_sphere(Vec3(8.0, 1.0, 30.0), 5.0,
+                                 Box::new(m1.clone())));
+    let s3 = Box::new(new_sphere(Vec3(8.0, -10.0, 20.0), 5.0,
+                                 Box::new(m1.clone())));
+    let s4 = Box::new(new_sphere(Vec3(-3.0, 2.0, 10.0), 3.0,
+                                 Box::new(m1.clone())));
+    let p1 = Box::new(new_plane(Vec3(0.0, 3.001, 0.0), Vec3(0.0, 1.0, 0.0),
+                                Box::new(m2)));
+
+    Scene {
         lights: Lights { dir: (Vec3(-0.5, -1.0, -0.75)).normalized(),
                          ambiant: 0.2,
                          bg: new_color(20.0, 20.0, 30.0) },
-        objects: vec![&s1, &s2, &s3, &s4, &p1]
-    };
+        objects: vec![s1, s2, s3, s4, p1],
+    }
+}
+
+fn main() {
+    let filename = "out.ppm";
+    let cam = Camera { width:1200, height:800, depth:700 };
+    let scene = make_scene();
     println!("rendering...");
     let now = Instant::now();
-    let frame = render_frame(scene, cam.clone());
+    let frame = render_frame(Arc::new(scene), cam.clone());
     let time = now.elapsed().as_millis() as f32 / 1000.0;
     println!("done in {} seconds.", time);
     match write_image(&frame_to_image(&frame), &cam, filename) {
@@ -101,27 +109,34 @@ pub struct Loc(u32,u32,Vec3);
 unsafe impl Send for Loc {}
 unsafe impl Sync for Loc {}
 
-fn render_frame(scene: Scene, cam: Camera) -> Vec<Color>{
+fn render_frame(scene: Arc<Scene>, cam: Camera) -> Vec<Color>{
     let mut frame = vec![BLACK ; (cam.width*cam.height) as usize];
 
     let (tx, rx) = mpsc::channel();
     let slice=cam.height/THREADS;
     for i in 0..THREADS {
-        println!("from line: {} to: {}", slice*i, slice*(i+1));
+        println!("spwan thread #{} from line: {} to: {}",
+                 i, slice*i, slice*(i+1));
         render_slice(scene.clone(), cam.clone(),
                      slice*i, slice*(i+1), tx.clone());
     }
-    for _n in 0..cam.width*cam.height {
+    let len = cam.width*cam.height;
+    let mut pc = 0;
+    for n in 0..len {
         let Loc(x,y,col) = rx.recv().unwrap();
         frame[(x + y * cam.width) as usize] = col;
+        let new_pc = 100*n/len;
+        if new_pc/10 > pc/10 {
+            println!("{}%", new_pc);
+        }
+        pc = new_pc;
     }
     frame
 }
 
-fn render_slice(scene: Scene, cam: Camera,
-                from: u32, to: u32, tx: Sender<Loc>) {
-    //let scene = Arc::new(scene);
-    //thread::spawn(move || {
+fn render_slice<'a>(scene: Arc<Scene>, cam: Camera,
+                    from: u32, to: u32, tx: Sender<Loc>) {
+    thread::spawn(move || {
         let mut rng = rand::thread_rng();
         let orig = Vec3(0.0, 0.0, 0.0);
         let center = Vec3(-(cam.width as Float) / 2.0,
@@ -136,10 +151,10 @@ fn render_slice(scene: Scene, cam: Camera,
                     let ray = Ray { orig: orig, dir: dir + rnd };
                     col = col + render_pixel(&scene, ray, REFLECTIONS);
                 }
-                tx.send(Loc(x, y, col / SUBSAMPLE as Float));
+                tx.send(Loc(x, y, col / SUBSAMPLE as Float)).unwrap();
             }
         }
-    //});
+    });
 }
 
 fn render_pixel(scene: &Scene, ray: Ray, n: u32) -> Color {
@@ -170,17 +185,19 @@ fn reflect(v: Vec3, n: Vec3) -> Vec3 {
     v - n * v.dot(&n) * 2.0
 }
 
-fn cast_ray<'a>(objs: &'a Vec<&Intersect>, ray: Ray) -> Option<Hit<'a>> {
+fn cast_ray<'a>(objs: &'a [Box<dyn Intersect>], ray: Ray)
+                -> Option<Hit<'a>> {
     objs.iter().fold(None,
                      |res, obj|
                      match obj.intersect(&ray.orig, &ray.dir) {
                          None => res,
                          Some(z) => {
                              match res {
-                                 None => Some((*obj, z)),
-                                 Some((_,i)) if z < i => Some((*obj, z)),
+                                 None => Some((obj.as_ref(), z)),
+                                 Some((_,i)) if z < i =>
+                                     Some((obj.as_ref(), z)),
                                  _ => res
                              }
                          }
-                     }).map(| (obj, z) | (obj, ray.dir * z + ray.orig))
+                     }).map(| (obj, z) | (&*obj, ray.dir * z + ray.orig))
 }

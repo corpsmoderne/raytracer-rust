@@ -3,18 +3,18 @@ use crate::color::Material;
 use crate::object::Intersect;
 use std::option::Option;
 
-#[derive(Clone)]
-pub struct Plane<'a> {
+pub struct Plane {
     pos: Vec3,
     normal: Vec3,
-    mat: &'a Material
+    mat: Box<dyn Material>
 }
+unsafe impl Send for Plane {}
 
-pub fn new_plane(p : Vec3, n : Vec3, m : &Material) -> Plane {
+pub fn new_plane(p : Vec3, n : Vec3, m : Box<dyn Material>) -> Plane {
     Plane { pos: p, normal: n, mat: m }
 }
 
-impl<'a> Intersect for Plane<'a> {
+impl Intersect for Plane {
     fn intersect(&self, orig : &Vec3, dir : &Vec3) -> Option<Float> {
         let denom = dir.dot(&self.normal);
         let p = self.pos - orig.clone();
@@ -35,7 +35,7 @@ impl<'a> Intersect for Plane<'a> {
     }
 
     fn get_material(&self) -> &Material {
-        self.mat
+        &*self.mat
     }
 
 }

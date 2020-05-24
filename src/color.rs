@@ -14,7 +14,7 @@ pub struct Lights {
     pub bg: Color
 }
 
-pub trait Material : Sync {
+pub trait Material : Sync + Send{
     fn get_color(&self, p : &Vec3, n : &Vec3, lights : &Lights) -> Color;
     fn get_reflection(&self) -> Float;
     fn get_specular(&self, specular: (Float, Float),
@@ -25,11 +25,13 @@ pub trait Material : Sync {
     }
 }
 
+#[derive(Clone)]
 pub struct Solid {
     pub color : Color,
     pub specular : (Float,Float),
     pub reflection : Float
 }
+unsafe impl Send for Solid {}
 
 impl Material for Solid {
     fn get_color(&self, _p : &Vec3, n : &Vec3, lights : &Lights) -> Color {
@@ -42,12 +44,14 @@ impl Material for Solid {
     }
 }
 
+#[derive(Clone)]
 pub struct Checker {
     pub colors : (Color,Color),
     pub uv : i32,
     pub specular : (Float,Float),
     pub reflection : Float        
 }
+unsafe impl Send for Checker {}
 
 impl Material for Checker {
     fn get_color(&self, p : &Vec3, n : &Vec3, lights : &Lights) -> Color {
