@@ -107,7 +107,6 @@ fn write_image(img: &Vec<u8>, cam: &Camera, filename: &str) -> OutResult {
 
 pub struct Loc(u32,u32,Vec3);
 unsafe impl Send for Loc {}
-unsafe impl Sync for Loc {}
 
 fn render_frame(scene: Arc<Scene>, cam: Camera) -> Vec<Color>{
     let mut frame = vec![BLACK ; (cam.width*cam.height) as usize];
