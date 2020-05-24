@@ -28,6 +28,9 @@ const THREADS : u32 = 8;
 type Hit<'a> = (&'a dyn Intersect, Vec3);
 type OutResult = Result<(), std::io::Error>;
 
+pub struct Line(u32, Vec<Vec3>);
+unsafe impl Send for Line {}
+
 #[derive(Debug,Clone,Copy)]
 struct Ray {
     orig: Vec3,
@@ -74,7 +77,7 @@ fn make_scene() -> Scene {
 
 fn main() {
     let filename = "out.ppm";
-    let cam = Camera { width:1200, height:800, depth:700 };
+    let cam = Camera { width:2400, height:1600, depth:1400 };
     let scene = make_scene();
     println!("rendering...");
     let now = Instant::now();
@@ -105,33 +108,31 @@ fn write_image(img: Vec<u8>, cam: Camera, filename: &str) -> OutResult {
     Ok(())
 }
 
-pub struct Loc(u32,u32,Vec3);
-unsafe impl Send for Loc {}
-
 fn render_frame(scene: Arc<Scene>, cam: Arc<Camera>) -> Vec<Color>{
-    let len = cam.width*cam.height;
-    let mut frame = vec![BLACK ; len as usize];
+    let mut frame = vec![BLACK ; (cam.width*cam.height) as usize];
     let (tx, rx) = mpsc::channel();
     for i in 0..THREADS {
-        println!("spwan thread #{}", i);
         render_slice(scene.clone(), cam.clone(), i, tx.clone());
     }
     let mut pc = 0;
-    for n in 0..len {
-        let Loc(x,y,col) = rx.recv().unwrap();
-        frame[(x + y * cam.width) as usize] = col;
-        let new_pc = 100*n/len;
+    for n in 0..cam.height {
+        let Line(y, colors) = rx.recv().unwrap();
+        frame[(y*cam.width) as usize .. (cam.width+y*cam.width) as usize]
+            .clone_from_slice(&colors);
+        let new_pc = 100*n/cam.height;
         if new_pc/10 > pc/10 {
             println!("{}%", new_pc);
         }
         pc = new_pc;
     }
+    println!("100%");
     frame
 }
 
 fn render_slice<'a>(scene: Arc<Scene>, cam: Arc<Camera>,
-                    id: u32, tx: Sender<Loc>) {
+                    id: u32, tx: Sender<Line>) {
     thread::spawn(move || {
+        println!("spwan thread #{}", id);
         let mut rng = rand::thread_rng();
         let orig = Vec3(0.0, 0.0, 0.0);
         let center = Vec3(-(cam.width as Float) / 2.0,
@@ -139,6 +140,7 @@ fn render_slice<'a>(scene: Arc<Scene>, cam: Arc<Camera>,
                           cam.depth as Float);
         for yy in 0..cam.height/THREADS {
             let y = yy*THREADS+id;
+            let mut line = vec![BLACK ; cam.width as usize];
             for x in 0..cam.width {
                 let dir = Vec3(x as Float, y as Float, 0.0) + center;
                 let mut col = BLACK;
@@ -147,8 +149,9 @@ fn render_slice<'a>(scene: Arc<Scene>, cam: Arc<Camera>,
                     let ray = Ray { orig: orig, dir: dir + rnd };
                     col = col + render_pixel(&scene, ray, REFLECTIONS);
                 }
-                tx.send(Loc(x, y, col / SUBSAMPLE as Float)).unwrap();
+                line[x as usize] = col / SUBSAMPLE as Float;
             }
+            tx.send(Line(y, line)).unwrap();
         }
     });
 }
