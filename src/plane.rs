@@ -10,8 +10,8 @@ pub struct Plane {
 }
 unsafe impl Send for Plane {}
 
-pub fn new_plane(p : Vec3, n : Vec3, m : Box<dyn Material>) -> Plane {
-    Plane { pos: p, normal: n, mat: m }
+pub fn new_plane(p : Vec3, n : Vec3, m : Box<dyn Material>) -> Box<Plane> {
+    Box::new(Plane { pos: p, normal: n, mat: m })
 }
 
 impl Intersect for Plane {

@@ -9,7 +9,6 @@ mod raytracer;
 use std::io::prelude::*;
 use std::fs::File;
 use std::time::Instant;
-
 use std::sync::Arc;
 
 use vec3::{ Vec3, Norm };
@@ -21,7 +20,6 @@ use render::render_frame;
 
 type OutResult = Result<(), std::io::Error>;
 
-
 fn make_scene() -> Scene {
     let m1 = Solid { color: new_color(255.0, 100.0, 100.0),
                      specular: (8.0, 0.4), reflection: 0.75 };
@@ -29,22 +27,17 @@ fn make_scene() -> Scene {
     let m2 = Checker { colors: (new_color(150.0, 150.0, 225.0),
                                 new_color(200.0, 200.0, 300.0)),
                        uv: 10, specular: (4.0, 0.4), reflection: 0.5 };
-    let s1 = Box::new(new_sphere(Vec3(-2.0, -5.0, 30.0), 5.0,
-                                 Box::new(m1.clone())));
-    let s2 = Box::new(new_sphere(Vec3(8.0, 1.0, 30.0), 5.0,
-                                 Box::new(m1.clone())));
-    let s3 = Box::new(new_sphere(Vec3(8.0, -10.0, 20.0), 5.0,
-                                 Box::new(m1.clone())));
-    let s4 = Box::new(new_sphere(Vec3(-3.0, 2.0, 10.0), 3.0,
-                                 Box::new(m1.clone())));
-    let p1 = Box::new(new_plane(Vec3(0.0, 3.001, 0.0), Vec3(0.0, 1.0, 0.0),
-                                Box::new(m2)));
-
     Scene {
         lights: Lights { dir: (Vec3(-0.5, -1.0, -0.75)).normalized(),
                          ambiant: 0.2,
                          bg: new_color(20.0, 20.0, 30.0) },
-        objects: vec![s1, s2, s3, s4, p1],
+        objects: vec![
+            new_sphere(Vec3(-2.0, -5.0, 30.0), 5.0, Box::new(m1.clone())),
+            new_sphere(Vec3(8.0, 1.0, 30.0), 5.0, Box::new(m1.clone())),
+            new_sphere(Vec3(8.0, -10.0, 20.0), 5.0, Box::new(m1.clone())),
+            new_sphere(Vec3(-3.0, 2.0, 10.0), 3.0, Box::new(m1.clone())),
+            new_plane(Vec3(0.0, 3.001, 0.0), Vec3(0.0, 1.0, 0.0), Box::new(m2))
+        ]
     }
 }
 

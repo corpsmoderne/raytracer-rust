@@ -11,8 +11,8 @@ pub struct Sphere {
 }
 unsafe impl Send for Sphere {}
 
-pub fn new_sphere(p : Vec3, r : Float, m : Box<dyn Material>) -> Sphere {
-    Sphere { pos:p, radius:r, r2: r.powf(2.0), mat:m }
+pub fn new_sphere(p : Vec3, r : Float, m : Box<dyn Material>) -> Box<Sphere> {
+    Box::new(Sphere { pos:p, radius:r, r2: r.powf(2.0), mat:m })
 }
     
 enum Solution {
