@@ -34,7 +34,7 @@ struct Ray {
     dir: Vec3,
 }
 
-#[derive(Clone)]
+#[derive(Clone,Copy)]
 struct Camera {
     width: u32,
     height: u32,
@@ -78,10 +78,10 @@ fn main() {
     let scene = make_scene();
     println!("rendering...");
     let now = Instant::now();
-    let frame = render_frame(Arc::new(scene), cam.clone());
+    let frame = render_frame(Arc::new(scene), Arc::new(cam));
     let time = now.elapsed().as_millis() as f32 / 1000.0;
     println!("done in {} seconds.", time);
-    match write_image(&frame_to_image(&frame), &cam, filename) {
+    match write_image(frame_to_image(&frame), cam, filename) {
         Ok(()) => println!("{} written.", filename),
         Err(err) => println!("Error: {}", err)
     }
@@ -97,7 +97,7 @@ fn frame_to_image(frame: &Vec<Color>) -> Vec<u8> {
     buffer
 }
 
-fn write_image(img: &Vec<u8>, cam: &Camera, filename: &str) -> OutResult {
+fn write_image(img: Vec<u8>, cam: Camera, filename: &str) -> OutResult {
     let header = format!("P6 {} {} 255\n", cam.width, cam.height);    
     let mut file = File::create(filename)?;
     file.write(header.as_bytes())?;
@@ -108,18 +108,14 @@ fn write_image(img: &Vec<u8>, cam: &Camera, filename: &str) -> OutResult {
 pub struct Loc(u32,u32,Vec3);
 unsafe impl Send for Loc {}
 
-fn render_frame(scene: Arc<Scene>, cam: Camera) -> Vec<Color>{
-    let mut frame = vec![BLACK ; (cam.width*cam.height) as usize];
-
-    let (tx, rx) = mpsc::channel();
-    let slice=cam.height/THREADS;
-    for i in 0..THREADS {
-        println!("spwan thread #{} from line: {} to: {}",
-                 i, slice*i, slice*(i+1));
-        render_slice(scene.clone(), cam.clone(),
-                     slice*i, slice*(i+1), tx.clone());
-    }
+fn render_frame(scene: Arc<Scene>, cam: Arc<Camera>) -> Vec<Color>{
     let len = cam.width*cam.height;
+    let mut frame = vec![BLACK ; len as usize];
+    let (tx, rx) = mpsc::channel();
+    for i in 0..THREADS {
+        println!("spwan thread #{}", i);
+        render_slice(scene.clone(), cam.clone(), i, tx.clone());
+    }
     let mut pc = 0;
     for n in 0..len {
         let Loc(x,y,col) = rx.recv().unwrap();
@@ -133,15 +129,16 @@ fn render_frame(scene: Arc<Scene>, cam: Camera) -> Vec<Color>{
     frame
 }
 
-fn render_slice<'a>(scene: Arc<Scene>, cam: Camera,
-                    from: u32, to: u32, tx: Sender<Loc>) {
+fn render_slice<'a>(scene: Arc<Scene>, cam: Arc<Camera>,
+                    id: u32, tx: Sender<Loc>) {
     thread::spawn(move || {
         let mut rng = rand::thread_rng();
         let orig = Vec3(0.0, 0.0, 0.0);
         let center = Vec3(-(cam.width as Float) / 2.0,
                           -(cam.height as Float) /2.0,
                           cam.depth as Float);
-        for y in from..to {
+        for yy in 0..cam.height/THREADS {
+            let y = yy*THREADS+id;
             for x in 0..cam.width {
                 let dir = Vec3(x as Float, y as Float, 0.0) + center;
                 let mut col = BLACK;
