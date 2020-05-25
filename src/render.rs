@@ -12,7 +12,6 @@ use std::sync::Arc;
 type Hit<'a> = (&'a dyn Intersect, Vec3);
 
 pub struct Line(u32, Vec<Vec3>);
-unsafe impl Send for Line {}
 
 #[derive(Debug,Clone,Copy)]
 struct Ray {

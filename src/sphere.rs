@@ -9,7 +9,6 @@ pub struct Sphere {
     r2 : Float,
     mat : Box<dyn Material>
 }
-unsafe impl Send for Sphere {}
 
 pub fn new_sphere(p : Vec3, r : Float, m : Box<dyn Material>) -> Box<Sphere> {
     Box::new(Sphere { pos:p, radius:r, r2: r.powf(2.0), mat:m })
@@ -64,7 +63,7 @@ impl Intersect for Sphere {
         (v.clone()-self.pos).normalized()
     }
     
-    fn get_material(&self) -> &Material {
+    fn get_material(&self) -> &dyn Material {
         &*self.mat
     }
 }

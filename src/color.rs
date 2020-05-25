@@ -31,7 +31,6 @@ pub struct Solid {
     pub specular : (Float,Float),
     pub reflection : Float
 }
-unsafe impl Send for Solid {}
 
 impl Material for Solid {
     fn get_color(&self, _p : &Vec3, n : &Vec3, lights : &Lights) -> Color {
@@ -51,7 +50,6 @@ pub struct Checker {
     pub specular : (Float,Float),
     pub reflection : Float        
 }
-unsafe impl Send for Checker {}
 
 impl Material for Checker {
     fn get_color(&self, p : &Vec3, n : &Vec3, lights : &Lights) -> Color {

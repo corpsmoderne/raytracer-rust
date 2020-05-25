@@ -20,11 +20,10 @@ pub struct Scene {
     pub objects: Vec<Box<dyn Intersect>>
 }
 
-
 pub trait Intersect : Sync + Send {
     fn intersect(&self, orig : &Vec3, dir : &Vec3) -> Option<Float>;
     fn get_surface(&self, v : &Vec3) -> Vec3;
     fn get_normal(&self, v : &Vec3) -> Vec3;
-    fn get_material(&self) -> &Material;
+    fn get_material(&self) -> &dyn Material;
 }
 

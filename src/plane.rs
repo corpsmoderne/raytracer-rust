@@ -8,7 +8,6 @@ pub struct Plane {
     normal: Vec3,
     mat: Box<dyn Material>
 }
-unsafe impl Send for Plane {}
 
 pub fn new_plane(p : Vec3, n : Vec3, m : Box<dyn Material>) -> Box<Plane> {
     Box::new(Plane { pos: p, normal: n, mat: m })
@@ -34,7 +33,7 @@ impl Intersect for Plane {
         v.clone() + self.normal.normalized() * -0.0001
     }
 
-    fn get_material(&self) -> &Material {
+    fn get_material(&self) -> &dyn Material {
         &*self.mat
     }
 
