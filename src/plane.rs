@@ -1,6 +1,6 @@
 use crate::vec3::{Vec3, Float, Dot, Norm};
 use crate::color::Material;
-use crate::object::Intersect;
+use crate::raytracer::Intersect;
 use std::option::Option;
 
 pub struct Plane {

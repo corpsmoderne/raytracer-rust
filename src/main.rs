@@ -2,7 +2,6 @@ mod vec3;
 mod color;
 mod sphere;
 mod plane;
-mod object;
 mod render;
 mod raytracer;
 

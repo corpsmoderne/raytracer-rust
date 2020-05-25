@@ -1,6 +1,5 @@
 use crate::vec3::{ Vec3, Float, Dot };
 use crate::color::Color;
-use crate::object::Intersect;
 use crate::raytracer::*;
 
 use rand::prelude::*;
