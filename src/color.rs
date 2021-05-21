@@ -14,7 +14,7 @@ pub struct Lights {
     pub bg: Color
 }
 
-pub trait Material : Sync + Send{
+pub trait Material : Sync + Send {
     fn get_color(&self, p : &Vec3, n : &Vec3, lights : &Lights) -> Color;
     fn get_reflection(&self) -> Float;
     fn get_specular(&self, specular: (Float, Float),
@@ -23,6 +23,7 @@ pub trait Material : Sync + Send{
             ((n.clone()*-1.0).dot(&light).acos() /
              (2.0 * PI * 1.0/3.0)).powf(specular.0)
     }
+    fn clone_box(&self) -> Box<dyn Material>;
 }
 
 #[derive(Clone)]
@@ -36,10 +37,12 @@ impl Material for Solid {
     fn get_color(&self, _p : &Vec3, n : &Vec3, lights : &Lights) -> Color {
         let spec = self.get_specular(self.specular, n, lights.dir);
         self.color * (spec + lights.ambiant)
-    }
-    
+    }    
     fn get_reflection(&self) -> Float {
         self.reflection
+    }
+    fn clone_box(&self) -> Box<dyn Material> {
+        Box::new(self.clone())
     }
 }
 
@@ -72,5 +75,9 @@ impl Material for Checker {
     
     fn get_reflection(&self) -> Float {
         self.reflection
+    }
+
+    fn clone_box(&self) -> Box<dyn Material>{
+        Box::new(self.clone())
     }
 }

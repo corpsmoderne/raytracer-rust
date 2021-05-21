@@ -8,7 +8,7 @@ use crate::color::{Color, Lights};
 use crate::vec3::{ Vec3, Float };
 use crate::color::{Material};
 
-#[derive(Clone,Copy)]
+#[derive(Clone,Copy,PartialEq)]
 pub struct Camera {
     pub width: u32,
     pub height: u32,
@@ -16,8 +16,10 @@ pub struct Camera {
 }
 
 pub struct Scene {
+    pub camera: Camera,
     pub lights: Lights,
-    pub objects: Vec<Box<dyn Intersect>>
+    pub objects: Vec<Box<dyn Intersect>>,
+    pub reflections: u32
 }
 
 pub trait Intersect : Sync + Send {

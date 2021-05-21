@@ -19,11 +19,12 @@ struct Ray {
     dir: Vec3,
 }
 
-pub fn render_frame(scene: Arc<Scene>, cam: Arc<Camera>) -> Vec<Color>{
+pub fn render_frame(scene: Arc<Scene>) -> Vec<Color>{
+    let cam = scene.camera;
     let mut frame = vec![BLACK ; (cam.width*cam.height) as usize];
     let (tx, rx) = mpsc::channel();
     for i in 0..THREADS {
-        render_slice(scene.clone(), cam.clone(), i, tx.clone());
+        render_slice(scene.clone(), i, tx.clone());
     }
     let mut pc = 0;
     for n in 0..cam.height {
@@ -40,9 +41,10 @@ pub fn render_frame(scene: Arc<Scene>, cam: Arc<Camera>) -> Vec<Color>{
     frame
 }
 
-fn render_slice<'a>(scene: Arc<Scene>, cam: Arc<Camera>,
-                    id: u32, tx: Sender<Line>) {
+fn render_slice<'a>(scene: Arc<Scene>, id: u32, tx: Sender<Line>) {
+                    
     thread::spawn(move || {
+        let cam = &scene.camera;
         println!("spwan thread #{}", id);
         let mut rng = rand::thread_rng();
         let orig = Vec3(0.0, 0.0, 0.0);
@@ -58,7 +60,7 @@ fn render_slice<'a>(scene: Arc<Scene>, cam: Arc<Camera>,
                 for _ in 0..SUBSAMPLE {
                     let rnd = Vec3(rng.gen(), rng.gen(), 0.0);
                     let ray = Ray { orig: orig, dir: dir + rnd };
-                    col = col + render_pixel(&scene, ray, REFLECTIONS);
+                    col = col + render_pixel(&scene, ray, scene.reflections);
                 }
                 line[x as usize] = col / SUBSAMPLE as Float;
             }
@@ -79,6 +81,7 @@ fn render_pixel(scene: &Scene, ray: Ray, n: u32) -> Color {
             let col = cast_ray(&scene.objects, ray2)
                 .map_or(col0, |_| col0 * scene.lights.ambiant );
             let reflection = m.get_reflection();
+            
             if n > 0 && reflection > 0.0 {
                 let ray3 = Ray { orig: surfp,
                                  dir: reflect(p-ray.orig, np) };
