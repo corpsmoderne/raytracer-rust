@@ -10,7 +10,6 @@ mod scene;
 use std::io::prelude::*;
 use std::fs::File;
 use std::time::Instant;
-use std::sync::Arc;
 use std::env;
 
 use color::Color;
@@ -28,10 +27,10 @@ fn main() {
     }
     let filename = "out.ppm";
     if let Some(scene) = load_scene(args[1].as_str()) {
-        let cam = scene.camera.clone();
+        let cam = scene.camera;
         println!("rendering...");
         let now = Instant::now();
-        let frame = render_frame(Arc::new(scene));
+        let frame = render_frame(&scene); //Arc::new(scene));
         let time = now.elapsed().as_millis() as f32 / 1000.0;
         println!("done in {} seconds.", time);
         match write_image(frame_to_image(&frame), cam, filename) {
@@ -44,9 +43,9 @@ fn main() {
 }
 
 fn frame_to_image(frame: &Vec<Color>) -> Vec<u8> {
-    let mut buffer = vec![0 as u8 ; frame.len() * 3];    
+    let mut buffer = vec![0_u8 ; frame.len() * 3];    
     for (i, c) in frame.iter().enumerate() {
-        buffer[i*3+0] = c.0.min(255.0).max(0.0) as u8;
+        buffer[i*3  ] = c.0.min(255.0).max(0.0) as u8;
         buffer[i*3+1] = c.1.min(255.0).max(0.0) as u8;
         buffer[i*3+2] = c.2.min(255.0).max(0.0) as u8;
     }
@@ -56,7 +55,7 @@ fn frame_to_image(frame: &Vec<Color>) -> Vec<u8> {
 fn write_image(img: Vec<u8>, cam: Camera, filename: &str) -> OutResult {
     let header = format!("P6 {} {} 255\n", cam.width, cam.height);    
     let mut file = File::create(filename)?;
-    file.write(header.as_bytes())?;
-    file.write(&img)?;
+    _ = file.write(header.as_bytes())?;
+    _ = file.write(&img)?;
     Ok(())
 }

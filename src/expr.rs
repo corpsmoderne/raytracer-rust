@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
     Lpar,
     Rpar,
@@ -63,16 +63,12 @@ pub fn cdr(cons : &Expr) -> Expr {
     }
 }
 
-fn new_word(tok : &Vec<char>) -> Token {
-    let s : String = tok.into_iter().collect();
-    return Token::Word(s.to_string());
+fn new_word(tok : &[char]) -> Token {
+    Token::Word(tok.iter().collect())
 }
 
 fn is_sep(c : char) -> bool {
-    match c {
-        '(' | ')' | ' ' | '\t' | '\n' | '\'' => true,
-        _ => false
-    } 
+    matches!(c, '(' | ')' | ' ' | '\t' | '\n' | '\'')
 }
 
 pub fn tokenize(input : &str) -> Vec<Token> {
@@ -80,7 +76,7 @@ pub fn tokenize(input : &str) -> Vec<Token> {
     let mut tok : Vec<char> = Vec::new();
 
     for c in input.chars() {
-        if is_sep(c) && tok.len() > 0 {
+        if is_sep(c) && !tok.is_empty() {
             vec.push(new_word(&tok));
             tok.clear();
         }
@@ -91,21 +87,21 @@ pub fn tokenize(input : &str) -> Vec<Token> {
             _ => tok.push(c)
         }
     }
-    if tok.len() > 0 {
+    if !tok.is_empty() {
         vec.push(new_word(&tok));
     }
     vec
 }
 
 fn parse_list(tokens : &[Token]) -> Option<(Expr , &[Token])> {
-    if tokens.len() < 1 {
+    if tokens.is_empty() {
         return None
     }
     match &tokens[0] {
         Token::Rpar => Some((Expr::Nil, &tokens[1..])),
         Token::Dot => parse_expr(&tokens[1..])
             .and_then(|(cdr, rest)|
-                      if rest.len() > 0 && rest[0] == Token::Rpar {
+                      if !rest.is_empty() && rest[0] == Token::Rpar {
                           Some ((cdr, &rest[1..]))
                       } else {
                           None
@@ -113,14 +109,14 @@ fn parse_list(tokens : &[Token]) -> Option<(Expr , &[Token])> {
         _ => parse_expr(tokens)
             .and_then(|(car, rest)| 
                       parse_list(rest)
-                      .and_then(|(cdr, rest2)|
-                                Some((Expr::Cons(Box::new(car),
-                                                 Box::new(cdr)), rest2))))
+                      .map(|(cdr, rest2)|
+                                (Expr::Cons(Box::new(car),
+                                            Box::new(cdr)), rest2)))
     }
 }
 
 pub fn parse_expr(tokens : &[Token]) -> Option<(Expr, &[Token])> {
-    if tokens.len() < 1 {
+    if tokens.is_empty() { 
         return None
     }
     match &tokens[0] {
@@ -142,12 +138,12 @@ pub fn parse_expr(tokens : &[Token]) -> Option<(Expr, &[Token])> {
 }
 
 pub fn parse_all(tokens: &[Token]) -> Option<Vec<Expr>> {
-    if tokens.len() == 0 {
+    if tokens.is_empty() {
         Some(vec![])        
     } else {
         parse_expr(tokens)
             .and_then(|(e1, rest)|
                       parse_all(rest)
-                      .and_then( | e2 | Some([vec![e1], e2].concat())))
+                      .map( | e2 | [vec![e1], e2].concat()))
     }
 }

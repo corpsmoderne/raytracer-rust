@@ -29,26 +29,26 @@ fn get_symbol(expr: &Expr) -> Option<String> {
 }
 
 fn get_cam(expr : &Expr) -> Option<Camera> {
-    let w = get_num(&car(&expr))?;
-    let h = get_num(&car(&cdr(&expr)))?;
-    let d = get_num(&car(&cdr(&cdr(&expr))))?;
+    let w = get_num(&car(expr))?;
+    let h = get_num(&car(&cdr(expr)))?;
+    let d = get_num(&car(&cdr(&cdr(expr))))?;
     Some(Camera { width: w as u32,
                   height: h as u32,
                   depth: d as u32 })
 }
 
 fn get_vec(expr: &Expr) -> Option<Vec3> {
-    let x = get_float(&car(&expr))?;
-    let y = get_float(&car(&cdr(&expr)))?;
-    let z = get_float(&car(&cdr(&cdr(&expr))))?;
+    let x = get_float(&car(expr))?;
+    let y = get_float(&car(&cdr(expr)))?;
+    let z = get_float(&car(&cdr(&cdr(expr))))?;
     Some(Vec3(x as f32, y as f32, z as f32))
 }
 
 fn get_sphere(expr: &Expr,
               materials: &HashMap<String, Box<dyn Material>>)
               -> Option<Box<Sphere>> {
-    let v = get_vec(&car(&expr))?;
-    let r = get_float(&car(&cdr(&expr)))?;
+    let v = get_vec(&car(expr))?;
+    let r = get_float(&car(&cdr(expr)))?;
     let mat_name = get_symbol(&car(&cdr(&cdr(expr))))?;
     let mat = materials.get(&mat_name)?;
     let s = new_sphere(v, r, mat.clone_box());
@@ -58,8 +58,8 @@ fn get_sphere(expr: &Expr,
 fn get_plane(expr: &Expr,
              materials: &HashMap<String, Box<dyn Material>>)
              -> Option<Box<Plane>> {
-    let v = get_vec(&car(&expr))?;
-    let n = get_vec(&car(&cdr(&expr)))?;
+    let v = get_vec(&car(expr))?;
+    let n = get_vec(&car(&cdr(expr)))?;
     let mat_name = get_symbol(&car(&cdr(&cdr(expr))))?;
     let mat = materials.get(&mat_name)?;
     let p = new_plane(v, n, mat.clone_box());
@@ -77,52 +77,52 @@ fn is_symbol(expr: &Expr, label: &str) -> Option<()> {
 
 fn get_color(expr: &Expr) -> Option<Color> {
     is_symbol(&car(expr), "color")?;
-    get_vec(&cdr(&expr))
+    get_vec(&cdr(expr))
 }
 
 fn get_specular(expr: &Expr) -> Option<(Float,Float)> {
-    is_symbol(&car(&expr), "spec")?;
-    let y = get_float(&car(&cdr(&expr)))?;
-    let z = get_float(&car(&cdr(&cdr(&expr))))?;
+    is_symbol(&car(expr), "spec")?;
+    let y = get_float(&car(&cdr(expr)))?;
+    let z = get_float(&car(&cdr(&cdr(expr))))?;
     Some((y, z))
 }
 
 fn get_reflection(expr: &Expr) -> Option<Float> {
     is_symbol(&car(expr), "reflection")?;
-    get_float(&car(&cdr(&expr)))
+    get_float(&car(&cdr(expr)))
 }
 
 fn get_uv(expr: &Expr) -> Option<i64> {
     is_symbol(&car(expr), "uv")?;
-    get_num(&car(&cdr(&expr)))
+    get_num(&car(&cdr(expr)))
 }
 
 fn get_solid(expr: &Expr) -> Option<Box<dyn Material>> {
-    let color = get_color(&car(&expr))?;
-    let spec = get_specular(&car(&cdr(&expr)))?;
-    let refl = get_reflection(&car(&cdr(&cdr(&expr))))?;
-    Some(Box::new(Solid { color: color,
+    let color = get_color(&car(expr))?;
+    let spec = get_specular(&car(&cdr(expr)))?;
+    let refl = get_reflection(&car(&cdr(&cdr(expr))))?;
+    Some(Box::new(Solid { color,
                           specular: spec,
                           reflection: refl }))
 }
 
 fn get_checkboard(expr: &Expr) -> Option<Box<dyn Material>> {
-    let color1 = get_color(&car(&expr))?;
-    let color2 = get_color(&car(&cdr(&expr)))?;
-    let uv = get_uv(&car(&(cdr(&cdr(&expr)))))?;
-    let spec = get_specular(&car(&cdr(&cdr(&cdr(&expr)))))?;
-    let refl = get_reflection(&car(&cdr(&cdr(&cdr(&cdr(&expr))))))?;
+    let color1 = get_color(&car(expr))?;
+    let color2 = get_color(&car(&cdr(expr)))?;
+    let uv = get_uv(&car(&(cdr(&cdr(expr)))))?;
+    let spec = get_specular(&car(&cdr(&cdr(&cdr(expr)))))?;
+    let refl = get_reflection(&car(&cdr(&cdr(&cdr(&cdr(expr))))))?;
     Some(Box::new(Checker
                   { colors: (color1, color2),
                     uv: uv as i32, specular: spec, reflection: refl }))
 }
 
 fn get_material(expr: &Expr) -> Option<(String, Box<dyn Material>)> {
-    let name = get_symbol(&car(&expr))?;
-    let shader = get_symbol(&car(&cdr(&expr)))?;
+    let name = get_symbol(&car(expr))?;
+    let shader = get_symbol(&car(&cdr(expr)))?;
     let m : Option<Box<dyn Material>> = match shader.as_str() {
-        "solid" => get_solid(&cdr(&cdr(&expr))),
-        "checkboard" => get_checkboard(&cdr(&cdr(&expr))),
+        "solid" => get_solid(&cdr(&cdr(expr))),
+        "checkboard" => get_checkboard(&cdr(&cdr(expr))),
         _ => None
     };
     m.map(|x| (name, x))
@@ -174,7 +174,7 @@ pub fn load_scene(filename: &str) -> Option<Scene> {
         lights: Lights { dir: (Vec3(-0.5, -1.0, -0.75)).normalized(),
                          ambiant: 0.2,
                          bg: new_color(20.0, 20.0, 30.0) },
-        objects: objects,
+        objects,
         reflections: reflections as u32
     })
 }

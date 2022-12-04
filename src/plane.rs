@@ -16,7 +16,7 @@ pub fn new_plane(p : Vec3, n : Vec3, m : Box<dyn Material>) -> Box<Plane> {
 impl Intersect for Plane {
     fn intersect(&self, orig : &Vec3, dir : &Vec3) -> Option<Float> {
         let denom = dir.dot(&self.normal);
-        let p = self.pos - orig.clone();
+        let p = self.pos - *orig;
         if denom < 0.000001 {
             None
         } else {
@@ -30,7 +30,7 @@ impl Intersect for Plane {
     }
     
     fn get_surface(&self, v : &Vec3) -> Vec3 {
-        v.clone() + self.normal.normalized() * -0.0001
+        *v + self.normal.normalized() * -0.0001
     }
 
     fn get_material(&self) -> &dyn Material {

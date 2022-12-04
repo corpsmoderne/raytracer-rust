@@ -20,7 +20,7 @@ pub trait Material : Sync + Send {
     fn get_specular(&self, specular: (Float, Float),
                     n: &Vec3, light: Vec3) -> Float {
         specular.1 *
-            ((n.clone()*-1.0).dot(&light).acos() /
+            ((*n * -1.0).dot(&light).acos() /
              (2.0 * PI * 1.0/3.0)).powf(specular.0)
     }
     fn clone_box(&self) -> Box<dyn Material>;

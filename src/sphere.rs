@@ -39,9 +39,9 @@ fn solve_quadratic(a : Float, b : Float, c : Float) -> Solution {
 
 impl Intersect for Sphere {
     fn intersect(&self, orig : &Vec3, dir : &Vec3) -> Option<Float> {
-        let l = orig.clone() - self.pos;
-        let a = dir.dot(&dir);
-        let b = 2.0 * l.dot(&dir);
+        let l = *orig - self.pos;
+        let a = dir.dot(dir);
+        let b = 2.0 * l.dot(dir);
         let c = l.dot(&l) - self.r2;
         
         match solve_quadratic(a, b, c) {
@@ -54,13 +54,12 @@ impl Intersect for Sphere {
     }
 
     fn get_surface(&self, v : &Vec3) -> Vec3 {
-        let n = (v.clone()-self.pos).normalized();
-        let res = self.pos + n * self.radius * 1.0001;
-        res
+        let n = (*v - self.pos).normalized();
+        self.pos + n * self.radius * 1.0001
     }
 
     fn get_normal(&self, v : &Vec3) -> Vec3 {
-        (v.clone()-self.pos).normalized()
+        (*v - self.pos).normalized()
     }
     
     fn get_material(&self) -> &dyn Material {

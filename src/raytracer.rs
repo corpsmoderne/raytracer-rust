@@ -1,14 +1,14 @@
 pub const SUBSAMPLE : u32 = 25;
 pub const REFLECTIONS : u32 = 10;
 pub const BLACK : Color = Vec3(0.0, 0.0, 0.0);
-pub const THREADS : u32 = 4;
+pub const THREADS : u32 = 8;
 
 use std::option::Option;
 use crate::color::{Color, Lights};
 use crate::vec3::{ Vec3, Float };
 use crate::color::{Material};
 
-#[derive(Clone,Copy,PartialEq)]
+#[derive(Clone,Copy,PartialEq,Eq)]
 pub struct Camera {
     pub width: u32,
     pub height: u32,
