@@ -65,7 +65,7 @@ fn render_slice(scene: &Scene, id: u32, tx: Sender<Line>) {
             for _ in 0..SUBSAMPLE {
                 let rnd = Vec3(rng.gen(), rng.gen(), 0.0);
                 let ray = Ray { orig, dir: dir + rnd };
-                col = col + render_pixel(&scene, ray, scene.reflections);
+                col = col + render_pixel(scene, ray, scene.reflections);
                 }
             line[x as usize] = col / SUBSAMPLE as Float;
         }
