@@ -15,6 +15,12 @@ pub struct Camera {
     pub depth: u32
 }
 
+impl Camera {
+    pub fn get_frame_size(&self) -> usize {
+	(self.width * self.height) as usize
+    }
+}
+
 pub struct Scene {
     pub camera: Camera,
     pub lights: Lights,

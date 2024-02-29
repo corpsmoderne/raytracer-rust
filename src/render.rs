@@ -10,7 +10,7 @@ use std::sync::mpsc::Sender;
 
 type Hit<'a> = (&'a dyn Intersect, Vec3);
 
-pub struct Line(u32, Vec<Vec3>);
+pub struct Line(u32, Vec<Color>);
 
 #[derive(Debug,Clone,Copy)]
 struct Ray {
@@ -20,7 +20,7 @@ struct Ray {
 
 pub fn render_frame(scene: &Scene) -> Vec<Color> {
     let cam = scene.camera;
-    let mut frame = vec![BLACK ; (cam.width*cam.height) as usize];
+    let mut frame = vec![BLACK ; cam.get_frame_size()];
     let (tx, rx) = mpsc::channel();
     thread::scope(|s| {
 	for i in 0..THREADS {
@@ -61,13 +61,31 @@ fn render_slice(scene: &Scene, id: u32, tx: Sender<Line>) {
         let mut line = vec![BLACK ; cam.width as usize];
         for x in 0..cam.width {
             let dir = Vec3(x as Float, y as Float, 0.0) + center;
-            let mut col = BLACK;
-            for _ in 0..SUBSAMPLE {
-                let rnd = Vec3(rng.gen(), rng.gen(), 0.0);
-                let ray = Ray { orig, dir: dir + rnd };
-                col = col + render_pixel(scene, ray, scene.reflections);
-                }
-            line[x as usize] = col / SUBSAMPLE as Float;
+	    let ray = Ray { orig, dir: dir + Vec3(0.5, 0.5,0.0) };
+            let mut col = render_pixel(scene, ray, scene.reflections);
+	    let mut sub = false;
+	    let mut i = 1;
+	    let col1 = col;
+	    for (x1, y1) in [ (0.0, 0.0), (1.0, 1.0),
+			       (0.0, 1.0), (1.0, 1.0) ] {
+		let ray = Ray { orig, dir: dir + Vec3(x1, y1, 0.0) };
+                let col2 = render_pixel(scene, ray, scene.reflections);
+		if col2 != col1 {
+		    sub = true;
+		}
+		col = col + col2;		
+		i += 1;
+	    }
+	    if sub {
+		for _ in i..SUBSAMPLE {
+                    let rnd = Vec3(rng.gen(), rng.gen(), 0.0);
+                    let ray = Ray { orig, dir: dir + rnd };
+                    col = col + render_pixel(scene, ray, scene.reflections);
+		    i += 1;
+		}
+	    }
+	    //let i2 = i as Float * 10.0;
+	    line[x as usize] = col / i as Float; //Vec3(i2,i2,i2);
         }
         tx.send(Line(y, line)).unwrap();
     }

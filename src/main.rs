@@ -30,7 +30,7 @@ fn main() {
         let cam = scene.camera;
         println!("rendering...");
         let now = Instant::now();
-        let frame = render_frame(&scene); //Arc::new(scene));
+        let frame = render_frame(&scene);
         let time = now.elapsed().as_millis() as f32 / 1000.0;
         println!("done in {} seconds.", time);
         match write_image(frame_to_image(&frame), cam, filename) {

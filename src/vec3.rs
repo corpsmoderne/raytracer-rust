@@ -2,7 +2,7 @@ use std::ops;
 
 pub type Float = f32;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Vec3(pub Float, pub Float, pub Float);
 
 impl ops::Add<Vec3> for Vec3 {
